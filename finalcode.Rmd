@@ -1,0 +1,281 @@
+---
+title: "final_project"
+author: "Ashley Malmlov & Katrina Wheeler"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  word_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#https://www.neonscience.org/resources/learning-hub/tutorials/dc-time-series-plot-ggplot-r
+library("lubridate")
+library(ggplot2)
+library(scales)
+library(gridExtra)
+library(ggthemes)
+library(tidyverse)
+library(effects)
+library("ROCR")
+library(ggpubr)
+library(caret)
+```
+
+First, we load and clean the data - isolating the specific columns we are interested in, and removing any NA values.
+
+```{r}
+raw.dat <- read.csv(file = 'batdata.csv')
+colnames(raw.dat)
+dat <- raw.dat[, c(4,5,8, 14, 15, 16, 28)]
+
+dat.clean <- na.omit(dat)
+```
+
+Below, is a bar graph of seropositivity by country
+
+```{r}
+country.neg <- dat.clean%>%group_by(Country)%>%summarize(No.Neg=sum(Henipavirus == 0))
+
+country.pos <- dat.clean%>%group_by(Country)%>%summarize(No.Pos=sum(Henipavirus != 0))
+
+count.country <- cbind(country.neg, No.Pos=country.pos$No.Pos)
+count.country <- cbind(count.country, Total=count.country$No.Neg+count.country$No.Pos)
+count.country <- cbind(count.country, f.i=round(count.country$No.Pos/count.country$Total, digits=2))
+
+count.country
+
+bar.country <- ggplot(count.country, aes(x=Country, y=f.i)) + geom_bar(fill='skyblue4', stat = 'identity') + ylab('Frequency') + ggtitle('Seropositivity by Country') + theme_classic()
+
+bar.country <- bar.country + theme(plot.title = element_text(hjust=0.5)) 
+
+bar.country <- bar.country + geom_text(aes(label=paste('N =', Total)), vjust = -0.3)
+bar.country
+```
+
+The following graph represents seropositivity by sex.
+
+```{r}
+sex.neg <- dat.clean%>%group_by(Sex)%>%summarize(No.Neg=sum(Henipavirus == 0))
+
+sex.pos <- dat.clean%>%group_by(Sex)%>%summarize(No.Pos=sum(Henipavirus != 0))
+
+count.sex <- cbind(sex.neg, No.Pos=sex.pos$No.Pos)
+count.sex <- cbind(count.sex, Total=count.sex$No.Neg+count.sex$No.Pos)
+count.sex <- cbind(count.sex, f.i=round(count.sex$No.Pos/count.sex$Total, digits=2))
+
+count.sex
+
+bar.sex <- ggplot(count.sex, aes(x=Sex, y=f.i)) + geom_bar(fill='skyblue3', stat = 'identity') + ylab('Frequency') + ggtitle('Seropositivity By Sex') + theme_classic()
+
+bar.sex <- bar.sex + theme(plot.title = element_text(hjust=0.5)) 
+
+bar.sex <- bar.sex + geom_text(aes(label=paste('N =', Total)), vjust = -0.3)
+
+bar.sex <- bar.sex + coord_cartesian(ylim =c(0,1))
+bar.sex
+```
+
+Our next graph represents seropositivity by age, as characterized by the following.
+
+Description of Age classification (assessed by morphological characteristics): 
+N -- Neonate; <2mths
+J -- Juvenile; 2 – <6 months
+SI -- Sexually Immature; 6 – <24 months
+A -- Adult; ≥24 months
+
+```{r}
+age.neg <- dat.clean%>%group_by(Age)%>%summarize(No.Neg=sum(Henipavirus == 0))
+
+age.pos <- dat.clean%>%group_by(Age)%>%summarize(No.Pos=sum(Henipavirus != 0))
+
+count.age <- cbind(age.neg, No.Pos=age.pos$No.Pos)
+count.age <- cbind(count.age, Total=count.age$No.Neg+count.age$No.Pos)
+count.age <- cbind(count.age, f.i=round(count.age$No.Pos/count.age$Total, digits=2))
+
+
+
+count.age
+
+bar.age <- ggplot(count.age, aes(x=Age, y=f.i)) + geom_bar(fill='skyblue2', stat = 'identity') + ylab('Frequency') + ggtitle('Seropositivity By Age') + theme_classic()
+
+bar.age <- bar.age + theme(plot.title = element_text(hjust=0.5)) 
+
+bar.age <- bar.age + geom_text(aes(label=paste('N =', Total)), vjust = -0.3)
+
+bar.age <- bar.age + coord_cartesian(ylim =c(0,1))
+
+bar.age <- bar.age +scale_x_discrete(limits = c("A", "N", "J", "SI"))
+bar.age
+```
+
+We've broken the age down even farther as designated in the original date, breaking the Sexually Immature category down to 6 month increments.
+
+Description of Age.3 classification (assessed by morphological characteristics and timing of sampling relative to the birth pulse. In some bats classified as SI, the timing of sampling in relation to the birthing season permitted further classification of SI individuals into 6-month age groups: 
+SI.1; 6 – <12 months
+SI.2; 12 – <18 months
+SI.3; 18 – <24 months
+For those SI bats that could not be more accurately classified, they remain in the category of SI, ranging in age from 6 months to <24 months. 
+
+```{r}
+ageSI.sub.neg <- dat.clean%>%group_by(Age.3)%>%summarize(No.Neg=sum(Henipavirus == 0))
+
+ageSI.sub.pos <- dat.clean%>%group_by(Age.3)%>%summarize(No.Pos=sum(Henipavirus != 0))
+
+count.ageSI.sub <- cbind(ageSI.sub.neg, No.Pos=ageSI.sub.pos$No.Pos)
+count.ageSI.sub <- cbind(count.ageSI.sub, Total=count.ageSI.sub$No.Neg+count.ageSI.sub$No.Pos)
+count.ageSI.sub <- cbind(count.ageSI.sub, f.i=round(count.ageSI.sub$No.Pos/count.ageSI.sub$Total, digits=2))
+
+count.ageSI.sub
+
+bar.age3 <- ggplot(count.ageSI.sub, aes(x=Age.3, y=f.i)) + geom_bar(fill='skyblue1', stat = 'identity') + ylab('Frequency') + ggtitle('Seropositivity By Age with SI Subgroups') + theme_classic()
+
+bar.age3 <- bar.age3 + theme(plot.title = element_text(hjust=0.5)) 
+
+bar.age3 <- bar.age3 + geom_text(aes(label=paste('N =', Total)), vjust = -0.3)
+
+bar.age3 <- bar.age3 + coord_cartesian(ylim =c(0,1))
+
+bar.age3 <- bar.age3 + scale_x_discrete(limits = c("A", "N", "J", "SI", "SI.1", "SI.2", "SI.3"))
+bar.age3
+```
+
+Our next visualization presents the number of seropositive bats by sampling date.
+
+```{r}
+samp.date.neg <- dat.clean%>%group_by(Samplingdate)%>%summarize(No.Neg=sum(Henipavirus == 0))
+
+samp.date.pos <- dat.clean%>%group_by(Samplingdate)%>%summarize(No.Pos=sum(Henipavirus != 0))
+
+count.samp.date <- cbind(samp.date.neg, No.Pos=samp.date.pos$No.Pos)
+count.samp.date <- cbind(count.samp.date, Total=count.samp.date$No.Neg+count.samp.date$No.Pos)
+count.samp.date <- cbind(count.samp.date, Prob.Pos=round(count.samp.date$No.Pos/count.samp.date$Total, digits=2))
+
+count.samp.date$Samplingdate <- as.Date(count.samp.date$Samplingdate)
+
+head(count.samp.date)
+
+ggplot(count.samp.date, aes(Samplingdate, No.Pos)) +
+           geom_point(color="skyblue4", alpha = 0.7) + ggtitle("Number of Seropositive Bats by Date") +
+           xlab("Date") + ylab("Number Positive") + (scale_x_date(breaks=date_breaks("2 months"),
+      labels=date_format("%b %y"))) + theme(plot.title = element_text(hjust=0.5)) + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+Below, we've converted the strings we are interested in into factors. We then use the factors to test a logistic regression on the Age variable, and plot the predicted probability of seropositivity based on age. 
+
+```{r}
+date_conversion <- dat.clean%>%mutate(Samplingdate=as.Date(Samplingdate, format="%Y-%m-%d"))
+
+
+data_new1 <- date_conversion                            
+data_new1$year <- strftime(data_new1$Samplingdate, "%Y")  
+data_new1$month <- strftime(data_new1$Samplingdate, "%m")
+head(data_new1)
+
+data_new1$Sex <- as.factor(data_new1$Sex)
+data_new1$Country <- as.factor(data_new1$Country)
+data_new1[data_new1$Henipavirus == 0,]$Henipavirus <- "seronegative"
+data_new1[data_new1$Henipavirus == 1,]$Henipavirus <- "seropositive"
+data_new1$Henipavirus <- as.factor(data_new1$Henipavirus)
+data_new1$Age <- as.factor(data_new1$Age)
+data_new1$Age.3 <- as.factor(data_new1$Age.3)
+
+logisticAGE <- glm(Henipavirus ~ Age, data = data_new1, family = "binomial")
+summary(logisticAGE)
+
+predicted.data <- data.frame(
+  probability.of.henipavirus = logisticAGE$fitted.values,
+  Henipavirus = data_new1$Henipavirus
+)
+
+predicted.data <- predicted.data[
+  order(predicted.data$probability.of.henipavirus, decreasing= FALSE),]
+
+predicted.data$rank <- 1:nrow(predicted.data)
+
+library(ggplot2)
+library(cowplot)
+
+ggplot(data=predicted.data, aes(x=data_new1$Age, y=probability.of.henipavirus)) +
+  geom_point(aes(color=Henipavirus), alpha=1, shape=4, stroke=2) +
+  xlab("Age") +
+  ylab("Predicted probability of getting henipavirus")
+
+```
+
+We tested the logistic regression with the Age.3 category, and provided the same predictive graph.
+
+```{r}
+#Henipavirus vs Age3
+logisticAGE3 <- glm(Henipavirus ~ Age.3, data = dat.clean, family = "binomial")
+summary(logisticAGE3)
+
+predicted.data <- data.frame(
+  probability.of.henipavirus = logisticAGE3$fitted.values,
+  Henipavirus = data_new1$Henipavirus
+)
+
+predicted.data <- predicted.data[
+  order(predicted.data$probability.of.henipavirus, decreasing= FALSE),]
+
+predicted.data$rank <- 1:nrow(predicted.data)
+
+library(ggplot2)
+library(cowplot)
+
+ggplot(data=predicted.data, aes(x=data_new1$Age.3, y=probability.of.henipavirus)) +
+  geom_point(aes(color=Henipavirus), alpha=1, shape=4, stroke=2) +
+  xlab("Age") +
+  ylab("Predicted probability of getting henipavirus")
+```
+
+We used cross validation to test the accuracy of our model.
+
+```{r}
+fitControl1 <- trainControl(method = "cv", number = 5, savePredictions = T)
+
+mod_fitcv <- train(Henipavirus ~ Age.3, data = data_new1, method = "glm", family = "binomial", trControl = fitControl1)
+
+summary(mod_fitcv)
+
+caret::confusionMatrix(table((mod_fitcv$pred)$pred,(mod_fitcv$pred)$obs))
+```
+
+CV with 10 repeated models
+```{r}
+crossValSettings <- trainControl(method = "repeatedcv", number = 10, savePredictions = TRUE)
+
+crossVal <- train(Henipavirus ~ Age.3, data = data_new1, family ="binomial", method = "glm", trControl = crossValSettings)
+crossVal
+
+pred <- predict(crossVal, newdata = data_new1)
+confusionMatrix(data = pred, data_new1$Henipavirus)
+```
+
+Confusion matrix: Prediction table: reference is what our data was, prediction is what the model got. This shows us true negatives (382), true positives (1082), false negatives (160), and false positives (671)
+
+Accuracy shows us how accurate the model is: 64%
+Below is ROC curve, which reflects the True Positive rate and False Positive rate
+
+```{r}
+logisticALL <- glm(Henipavirus ~ ., data = data_new1, family = "binomial")
+summary(logisticALL)
+
+#ROC curve of model for full set
+
+probAll <- predict(logisticALL, data_new1, type = "response")
+predictAll <- prediction(probAll, data_new1$Henipavirus)
+perfAll <- performance(predictAll, measure = "tpr", x.measure = "fpr")
+
+#ROC curve of model for Age.3
+
+probAGE <- predict(logisticAGE3, data_new1, type = "response")
+predictAge <- prediction(probAGE, data_new1$Henipavirus)
+perfAge <- performance(predictAge, measure = "tpr", x.measure = "fpr")
+
+plot(perfAll, col = "blue")
+plot(perfAge, add = TRUE, col = "red")
+```
+
